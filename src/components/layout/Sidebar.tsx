@@ -17,6 +17,7 @@ const navItems = [
 
 export function Sidebar({ open, onClose }: SidebarProps) {
   const { profile } = useAuthContext();
+  const canViewAllAttendance = profile?.role === 'admin' || profile?.role === 'manager';
 
   return (
     <aside
@@ -49,6 +50,22 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             <span>{label}</span>
           </NavLink>
         ))}
+
+        {canViewAllAttendance && (
+          <NavLink
+            to="/all-attendance"
+            onClick={onClose}
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-md px-3 py-2 text-sm text-gray-300 transition-colors hover:bg-gray-800 hover:text-white',
+                isActive && 'bg-gray-800 text-white',
+              )
+            }
+          >
+            <CalendarClock size={16} />
+            <span>All Attendance</span>
+          </NavLink>
+        )}
 
         {profile?.role === 'admin' && (
           <NavLink

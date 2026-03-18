@@ -68,11 +68,11 @@ export function useAttendanceHistory(filters?: { startDate?: string; endDate?: s
 }
 
 export function useMyAttendanceHistory() {
-  const { user, role } = useAuthContext();
+  const { user } = useAuthContext();
 
   return useQuery({
     queryKey: ['attendance-history-employee-all', user?.id],
-    enabled: role === 'employee' && !!user?.id,
+    enabled: !!user?.id,
     queryFn: async (): Promise<DailyAttendance[]> => {
       if (!user?.id) {
         return [];

@@ -6,6 +6,7 @@ import { isSupabaseConfigured } from './lib/supabase';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import AttendancePage from './pages/AttendancePage';
+import AllAttendancePage from './pages/AllAttendancePage';
 import LeavePage from './pages/LeavePage';
 import SalaryPage from './pages/SalaryPage';
 import AdminPage from './pages/AdminPage';
@@ -63,6 +64,7 @@ export default function App() {
         <Route element={<AppLayout />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/all-attendance" element={<AllAttendancePage />} />
           <Route path="/leave" element={<LeavePage />} />
           <Route path="/salary" element={<SalaryPage />} />
           <Route element={<ProtectedRoute role="admin" />}>
