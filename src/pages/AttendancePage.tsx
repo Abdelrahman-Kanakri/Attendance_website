@@ -4,7 +4,7 @@ import { AttendanceTable } from '../components/attendance/AttendanceTable';
 import { Input } from '../components/ui/input';
 import { Card } from '../components/ui/card';
 import { Button } from '../components/ui/button';
-import { useAttendanceHistory } from '../hooks/useAttendance';
+import { useAttendanceHistory, useMyAttendanceHistory } from '../hooks/useAttendance';
 import { useAuthContext } from '../context/AuthContext';
 import { getErrorMessage } from '../lib/errors';
 
@@ -55,8 +55,10 @@ export default function AttendancePage() {
     endDate: endDate || undefined,
     employee: employee || undefined,
   });
+  const myHistoryQuery = useMyAttendanceHistory();
 
   const errorMessage = getErrorMessage(attendanceQuery.error, 'Could not load attendance records.');
+  const myHistoryError = getErrorMessage(myHistoryQuery.error, 'Could not load attendance history.');
 
   const isAdminView = role === 'admin' || role === 'manager';
 
@@ -66,33 +68,31 @@ export default function AttendancePage() {
 
       <Card>
         <h2 className="mb-4 text-base font-semibold text-gray-900">
-          {isAdminView ? 'Filter Attendance (HR)' : 'My Attendance Records'}
+          {isAdminView ? 'Filter Attendance (HR)' : "Today's Attendance Submission"}
         </h2>
-        <div className={`grid gap-4 ${isAdminView ? 'md:grid-cols-6' : 'md:grid-cols-4'}`}>
-          <Input
-            type="month"
-            value={month}
-            onChange={(event) => {
-              const next = event.target.value;
-              setMonth(next);
-              const range = monthRange(next);
-              setStartDate(range.start);
-              setEndDate(range.end);
-            }}
-          />
-          <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-          {isAdminView && (
+        {isAdminView ? (
+          <div className="grid gap-4 md:grid-cols-6">
+            <Input
+              type="month"
+              value={month}
+              onChange={(event) => {
+                const next = event.target.value;
+                setMonth(next);
+                const range = monthRange(next);
+                setStartDate(range.start);
+                setEndDate(range.end);
+              }}
+            />
+            <Input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
+            <Input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
             <Input
               placeholder="Employee name"
               value={employee}
               onChange={(event) => setEmployee(event.target.value)}
             />
-          )}
-          <Button variant="outline" onClick={() => void attendanceQuery.refetch()}>
-            Apply
-          </Button>
-          {isAdminView && (
+            <Button variant="outline" onClick={() => void attendanceQuery.refetch()}>
+              Apply
+            </Button>
             <Button
               variant="outline"
               disabled={!attendanceQuery.data?.length}
@@ -116,8 +116,12 @@ export default function AttendancePage() {
             >
               Download CSV
             </Button>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="text-sm text-gray-600">
+            Only today&apos;s submitted attendance is shown to employees. HR can still review website login date/time.
+          </p>
+        )}
       </Card>
 
       {attendanceQuery.isLoading && <p className="text-sm text-gray-600">Loading attendance...</p>}
@@ -133,6 +137,35 @@ export default function AttendancePage() {
       )}
 
       {attendanceQuery.isSuccess && <AttendanceTable rows={attendanceQuery.data} />}
+
+      {!isAdminView && (
+        <Card>
+          <h2 className="mb-2 text-base font-semibold text-gray-900">My Attendance History</h2>
+          <p className="mb-4 text-sm text-gray-600">Read-only history of all submitted attendance days.</p>
+
+          {myHistoryQuery.isLoading && <p className="text-sm text-gray-600">Loading attendance history...</p>}
+
+          {myHistoryQuery.isError && (
+            <div className="rounded-lg border border-red-100 bg-red-50 p-3">
+              <p className="text-sm text-red-700">Could not load attendance history.</p>
+              <p className="mt-1 text-xs text-red-700">{myHistoryError}</p>
+              <Button className="mt-3" variant="outline" onClick={() => void myHistoryQuery.refetch()}>
+                Retry
+              </Button>
+            </div>
+          )}
+
+          {myHistoryQuery.isSuccess && (
+            <>
+              <div className="mb-4 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs uppercase tracking-wide text-gray-500">Total attended days</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{myHistoryQuery.data.length}</p>
+              </div>
+              <AttendanceTable rows={myHistoryQuery.data} />
+            </>
+          )}
+        </Card>
+      )}
     </div>
   );
 }

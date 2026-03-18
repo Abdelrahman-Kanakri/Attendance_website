@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,7 +7,7 @@ import { Input } from '../ui/input';
 import { Select } from '../ui/select';
 import { Textarea } from '../ui/textarea';
 import { Button } from '../ui/button';
-import { calculateWorkedHours, type AttendanceFormInput, useUpsertAttendance } from '../../hooks/useAttendance';
+import { type AttendanceFormInput, useUpsertAttendance } from '../../hooks/useAttendance';
 import { getErrorMessage } from '../../lib/errors';
 
 const attendanceSchema = z
@@ -44,6 +43,7 @@ export function AttendanceForm() {
     register,
     handleSubmit,
     watch,
+    setValue,
     formState: { errors, isSubmitting },
   } = useForm<AttendanceSchemaValues>({
     resolver: zodResolver(attendanceSchema),
@@ -61,24 +61,28 @@ export function AttendanceForm() {
   const checkIn = watch('check_in');
   const checkOut = watch('check_out');
   const addDetails = watch('add_details');
+  const [checkInHour = '', checkInMinute = ''] = checkIn?.split(':') ?? [];
+  const [checkOutHour = '', checkOutMinute = ''] = checkOut?.split(':') ?? [];
+  const hourOptions = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, '0'));
+  const minuteOptions = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, '0'));
 
-  const projectedWorkedHours = useMemo(() => {
-    if (!checkIn) {
-      return 0;
+  const setCheckInParts = (nextHour: string, nextMinute: string) => {
+    if (nextHour && nextMinute) {
+      setValue('check_in', `${nextHour}:${nextMinute}`, { shouldDirty: true, shouldValidate: true });
+      return;
     }
 
-    if (checkOut && checkOut > checkIn) {
-      return calculateWorkedHours(checkIn, checkOut);
+    setValue('check_in', '', { shouldDirty: true, shouldValidate: true });
+  };
+
+  const setCheckOutParts = (nextHour: string, nextMinute: string) => {
+    if (nextHour && nextMinute) {
+      setValue('check_out', `${nextHour}:${nextMinute}`, { shouldDirty: true, shouldValidate: true });
+      return;
     }
 
-    const now = new Date();
-    const currentTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-    if (currentTime <= checkIn) {
-      return 0;
-    }
-
-    return calculateWorkedHours(checkIn, currentTime);
-  }, [checkIn, checkOut]);
+    setValue('check_out', '', { shouldDirty: true, shouldValidate: true });
+  };
 
   const onSubmit = handleSubmit(async (values) => {
     try {
@@ -97,7 +101,7 @@ export function AttendanceForm() {
     <Card>
       <h2 className="mb-2 text-base font-semibold text-gray-900">My Attendance</h2>
       <p className="mb-4 text-sm text-gray-500">
-        Select a date, then save check-in / check-out and job description. You can also edit existing records below.
+        Select a date, then save check-in and optionally add check-out with job description.
       </p>
       <form className="grid gap-4 md:grid-cols-2" onSubmit={onSubmit}>
         <div>
@@ -117,7 +121,43 @@ export function AttendanceForm() {
 
         <div>
           <label className="text-sm font-medium text-gray-700">Check In</label>
-          <Input type="time" {...register('check_in')} />
+          <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-3">
+            <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+              <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="9"></circle>
+                <path d="M12 7v6l4 2"></path>
+              </svg>
+              Time Picker
+            </div>
+            <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+              <Select
+                value={checkInHour}
+                onChange={(event) => setCheckInParts(event.target.value, checkInMinute)}
+                aria-label="Check in hour"
+              >
+                <option value="">Hour</option>
+                {hourOptions.map((hour) => (
+                  <option key={hour} value={hour}>
+                    {hour}
+                  </option>
+                ))}
+              </Select>
+              <span className="text-center text-sm font-semibold text-gray-500">:</span>
+              <Select
+                value={checkInMinute}
+                onChange={(event) => setCheckInParts(checkInHour, event.target.value)}
+                aria-label="Check in minute"
+              >
+                <option value="">Minute</option>
+                {minuteOptions.map((minute) => (
+                  <option key={minute} value={minute}>
+                    {minute}
+                  </option>
+                ))}
+              </Select>
+            </div>
+            <p className="mt-2 text-xs text-gray-500">Selected: {checkIn || '--:--'}</p>
+          </div>
           {errors.check_in && <p className="text-xs text-red-600">{errors.check_in.message}</p>}
         </div>
 
@@ -130,7 +170,43 @@ export function AttendanceForm() {
           <>
             <div>
               <label className="text-sm font-medium text-gray-700">Check Out</label>
-              <Input type="time" {...register('check_out')} />
+              <div className="mt-1 rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="mb-2 flex items-center gap-2 text-xs font-medium uppercase tracking-wide text-gray-500">
+                  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <path d="M12 7v6l4 2"></path>
+                  </svg>
+                  Time Picker
+                </div>
+                <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                  <Select
+                    value={checkOutHour}
+                    onChange={(event) => setCheckOutParts(event.target.value, checkOutMinute)}
+                    aria-label="Check out hour"
+                  >
+                    <option value="">Hour</option>
+                    {hourOptions.map((hour) => (
+                      <option key={hour} value={hour}>
+                        {hour}
+                      </option>
+                    ))}
+                  </Select>
+                  <span className="text-center text-sm font-semibold text-gray-500">:</span>
+                  <Select
+                    value={checkOutMinute}
+                    onChange={(event) => setCheckOutParts(checkOutHour, event.target.value)}
+                    aria-label="Check out minute"
+                  >
+                    <option value="">Minute</option>
+                    {minuteOptions.map((minute) => (
+                      <option key={minute} value={minute}>
+                        {minute}
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+                <p className="mt-2 text-xs text-gray-500">Selected: {checkOut || '--:--'}</p>
+              </div>
               {errors.check_out && <p className="text-xs text-red-600">{errors.check_out.message}</p>}
             </div>
 
@@ -141,9 +217,8 @@ export function AttendanceForm() {
           </>
         )}
 
-        <div>
-          <label className="text-sm font-medium text-gray-700">Current Worked Hours (live)</label>
-          <Input value={projectedWorkedHours.toFixed(2)} readOnly />
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Worked hours are calculated after check-out is submitted.
         </div>
 
         <div className="md:col-span-2">

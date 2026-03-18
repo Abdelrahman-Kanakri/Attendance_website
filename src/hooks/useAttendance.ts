@@ -11,6 +11,12 @@ export interface AttendanceFormInput {
   job_description?: string;
 }
 
+function todayIsoLocal() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
 function toMinutes(time: string) {
   const [h, m] = time.split(':').map(Number);
   return h * 60 + m;
@@ -34,21 +40,51 @@ export function useAttendanceHistory(filters?: { startDate?: string; endDate?: s
 
       if (!canViewAll && user?.id) {
         query = query.eq('employee_id', user.id);
+
+        // Employees should only see today's submitted attendance rows.
+        query = query.eq('date', todayIsoLocal()).not('check_in', 'is', null);
       }
 
-      if (filters?.startDate) {
+      if (canViewAll && filters?.startDate) {
         query = query.gte('date', filters.startDate);
       }
 
-      if (filters?.endDate) {
+      if (canViewAll && filters?.endDate) {
         query = query.lte('date', filters.endDate);
       }
 
-      if (filters?.employee) {
+      if (canViewAll && filters?.employee) {
         query = query.ilike('employee_name', `%${filters.employee}%`);
       }
 
       const { data, error } = await query;
+      if (error) {
+        throw error;
+      }
+
+      return (data ?? []) as DailyAttendance[];
+    },
+  });
+}
+
+export function useMyAttendanceHistory() {
+  const { user, role } = useAuthContext();
+
+  return useQuery({
+    queryKey: ['attendance-history-employee-all', user?.id],
+    enabled: role === 'employee' && !!user?.id,
+    queryFn: async (): Promise<DailyAttendance[]> => {
+      if (!user?.id) {
+        return [];
+      }
+
+      const { data, error } = await supabase
+        .from('daily_attendance')
+        .select('*')
+        .eq('employee_id', user.id)
+        .not('check_in', 'is', null)
+        .order('date', { ascending: false });
+
       if (error) {
         throw error;
       }
