@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "node -e \"const fs=require('fs');const cp=require('child_process');if(!fs.existsSync('node_modules/vite/package.json')){cp.execSync('npm ci',{stdio:'inherit'});}\" && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "audit:backend": "node scripts/backend_audit.mjs"

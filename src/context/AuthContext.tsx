@@ -28,7 +28,6 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 function buildFallbackProfile(user: User): Profile {
   const fallbackName =
     (user.user_metadata?.full_name as string | undefined) ??
-    user.email?.split('@')[0] ??
     'Employee';
 
   return {

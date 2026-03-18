@@ -106,6 +106,60 @@ function useSetActive() {
   });
 }
 
+function useUpdateFullName() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, full_name }: { id: string; full_name: string }) => {
+      const cleaned = full_name.trim();
+      if (cleaned.length < 2) {
+        throw new Error('Name must be at least 2 characters.');
+      }
+
+      const { error } = await supabase.from('profiles').update({ full_name: cleaned }).eq('id', id);
+      if (error) {
+        throw error;
+      }
+
+      // Keep denormalized employee_name columns in sync immediately.
+      const { error: attendanceError } = await supabase
+        .from('daily_attendance')
+        .update({ employee_name: cleaned })
+        .eq('employee_id', id);
+      if (attendanceError) {
+        throw attendanceError;
+      }
+
+      const { error: leaveError } = await supabase
+        .from('leave_log')
+        .update({ employee_name: cleaned })
+        .eq('employee_id', id);
+      if (leaveError) {
+        throw leaveError;
+      }
+
+      const { error: salaryError } = await supabase
+        .from('salary')
+        .update({ employee_name: cleaned })
+        .eq('employee_id', id);
+      if (salaryError) {
+        throw salaryError;
+      }
+    },
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['admin-profiles'] });
+      await queryClient.invalidateQueries({ queryKey: ['attendance-history'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-stats'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-weekly-attendance'] });
+      await queryClient.invalidateQueries({ queryKey: ['dashboard-recent-leaves'] });
+      await queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
+      await queryClient.invalidateQueries({ queryKey: ['salary-records'] });
+      await queryClient.invalidateQueries({ queryKey: ['payroll-month'] });
+      await queryClient.invalidateQueries({ queryKey: ['salary-rewards'] });
+    },
+  });
+}
+
 function useCreateEmployeeProfile() {
   const queryClient = useQueryClient();
 
@@ -144,10 +198,12 @@ export default function AdminPage() {
   const profilesQuery = useProfiles();
   const updateRole = useUpdateRole();
   const setActive = useSetActive();
+  const updateFullName = useUpdateFullName();
   const createEmployeeProfile = useCreateEmployeeProfile();
   const leaveSettingsQuery = useLeaveSettingsAdmin();
   const upsertLeaveSettings = useUpsertLeaveSettings();
   const [leaveDraft, setLeaveDraft] = useState<Record<string, { annual: string; sick: string }>>({});
+  const [nameDraft, setNameDraft] = useState<Record<string, string>>({});
 
   const leaveByEmployee = useMemo(() => {
     const map = new Map<
@@ -214,6 +270,16 @@ export default function AdminPage() {
       toast.error(getErrorMessage(error, 'Unable to add employee profile.'));
     }
   });
+
+  const onSaveName = async (id: string, fallbackName: string) => {
+    const proposedName = nameDraft[id] ?? fallbackName;
+    try {
+      await updateFullName.mutateAsync({ id, full_name: proposedName });
+      toast.success('Employee name updated.');
+    } catch (error) {
+      toast.error(getErrorMessage(error, 'Unable to update employee name.'));
+    }
+  };
 
   if (profilesQuery.isLoading) {
     return <div className="p-6 text-sm text-gray-600">Loading employee management...</div>;
@@ -414,7 +480,26 @@ export default function AdminPage() {
             <TBody>
               {profilesQuery.data?.map((profile) => (
                 <tr key={profile.id} className="even:bg-gray-50">
-                  <td className="px-3 py-2">{profile.full_name}</td>
+                  <td className="px-3 py-2">
+                    <div className="flex min-w-64 items-center gap-2">
+                      <Input
+                        value={nameDraft[profile.id] ?? profile.full_name}
+                        onChange={(event) =>
+                          setNameDraft((prev) => ({
+                            ...prev,
+                            [profile.id]: event.target.value,
+                          }))
+                        }
+                      />
+                      <Button
+                        size="sm"
+                        disabled={updateFullName.isPending}
+                        onClick={() => void onSaveName(profile.id, profile.full_name)}
+                      >
+                        Save
+                      </Button>
+                    </div>
+                  </td>
                   <td className="px-3 py-2">{profile.email}</td>
                   <td className="px-3 py-2">
                     <Select
