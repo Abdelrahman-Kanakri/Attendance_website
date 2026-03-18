@@ -1,0 +1,5 @@
+services:
+  - type: web
+    name: hr-tracing
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
